@@ -12,6 +12,8 @@
 #include <omp.h>
 #endif
 
+#define SCALE 13 /* 13-12 seems to work well */ /* Fraction bits? */
+
 #if defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_ARM64)
 static inline uint32_t popcnt(uint32_t v) {
@@ -2630,6 +2632,26 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
+void gemm_nn_fixed(int M, int N, int K, float ALPHA,
+    float *A, int lda,
+    float *B, int ldb,
+    float *C, int ldc)
+{
+    int i, j, k;
+    for (i = 0; i < M; ++i) {
+        for (k = 0; k < K; ++k) {
+            /* mapping A_PART*/
+            PUT_IN_REGISTER int fixed_A_PART = ((int)(ALPHA*(1<<SCALE)) * (int)(A[i * lda + k]*(1<<SCALE))) >> SCALE;
+            for (j = 0; j < N; ++j) {
+                /* mapping result*/
+                int fixed_C_PART = ((fixed_A_PART *  (int)(B[k*ldb + j]*(1<<SCALE))) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
+
+                /* remapping */
+                C[i*ldc + j] = (float)(fixed_C_PART)/(1<<SCALE);
+            }
+        }
+    }
+}
 
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
@@ -2647,6 +2669,46 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
+    // static int count = 0;
+    // static char fileName[] = "matrixA/matrixA-0";
+    // static char letter = '0';
+
+    // if(count < 3){
+    //     fileName[16] = letter++;
+    //     FILE *file = fopen(fileName, "w");
+    //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
+    //     fprintf(file, "float matrixA[] = {");
+    //     for (int k = 0; k < K; ++k) {
+    //         for (int j = 0; j < N; ++j) {
+    //             fprintf(file, "%f, ", B[k*ldb + j]);
+    //         }
+    //         fprintf(file, "\n");
+    //     }
+    //     fprintf(file, "};\n");
+    //     fclose(file);
+    //     count++;
+    // }
+
+    // static int count = 0;
+    // static char fileName[] = "matrixB/matrixB-0";
+    // static char letter = '0';
+
+    // if(count < 3){
+    //     fileName[16] = letter++;
+    //     FILE *file = fopen(fileName, "w");
+    //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
+    //     fprintf(file, "float matrixB[] = {");
+    //     for (int k = 0; k < K; ++k) {
+    //         for (int j = 0; j < N; ++j) {
+    //             fprintf(file, "%f, ", B[k*ldb + j]);
+    //         }
+    //         fprintf(file, "\n");
+    //     }
+    //     fprintf(file, "};\n");
+    //     fclose(file);
+    //     count++;
+    // }
+
     is_avx();   // initialize static variable
     if (is_fma_avx2() && !TA && !TB) {
         gemm_nn_fast(M, N, K, ALPHA, A, lda, B, ldb, C, ldc);
@@ -2657,6 +2719,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         for (t = 0; t < M; ++t) {
             if (!TA && !TB)
                 gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+                // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             else if (TA && !TB)
                 gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
             else if (!TA && TB)
