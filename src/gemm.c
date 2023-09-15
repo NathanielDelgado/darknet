@@ -2653,6 +2653,29 @@ void gemm_nn_fixed(int M, int N, int K, float ALPHA,
     }
 }
 
+// SNR calcuation.
+// C_fxp is the fixed-point matrix.
+// C_flp is the floating-point matrix.
+// length is the size of the array
+float calculate_SNR(float *C_fxp, float *C_flp, int length)
+{
+  float sum_square_flp;
+  float diff, sum_square_diff;
+  float SNR;
+  int i;
+  
+  sum_square_flp=0;
+  sum_square_diff=0;
+  for (i=0; i<length; i++){
+    diff = C_fxp[i] - C_flp[i];
+    sum_square_flp += C_flp[i]*C_flp[i];
+    sum_square_diff += diff*diff;
+  }
+  SNR = 10*log10f(sum_square_flp/sum_square_diff);
+  return SNR;
+}
+
+
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
         float *B, int ldb,
@@ -2669,18 +2692,20 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
+    // float *C_fixed = calloc(sizeof(float), M * N);
+
     // static int count = 0;
     // static char fileName[] = "matrixA/matrixA-0";
     // static char letter = '0';
 
-    // if(count < 3){
+    // if(count < 1){
     //     fileName[16] = letter++;
     //     FILE *file = fopen(fileName, "w");
     //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
     //     fprintf(file, "float matrixA[] = {");
-    //     for (int k = 0; k < K; ++k) {
-    //         for (int j = 0; j < N; ++j) {
-    //             fprintf(file, "%f, ", B[k*ldb + j]);
+    //     for (int i = 0; i < M; ++i) {
+    //         for (int k = 0; k < K; ++k) {
+    //             fprintf(file, "%f, ", A[i * lda + k]);
     //         }
     //         fprintf(file, "\n");
     //     }
@@ -2693,7 +2718,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     // static char fileName[] = "matrixB/matrixB-0";
     // static char letter = '0';
 
-    // if(count < 3){
+    // if(count < 1){
     //     fileName[16] = letter++;
     //     FILE *file = fopen(fileName, "w");
     //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
@@ -2717,9 +2742,11 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         int t;
         #pragma omp parallel for
         for (t = 0; t < M; ++t) {
-            if (!TA && !TB)
+            if (!TA && !TB){
                 gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+                // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+            }
             else if (TA && !TB)
                 gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
             else if (!TA && TB)
@@ -2728,6 +2755,10 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
                 gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
         }
     }
+
+    // printf("SNR: %f\n", calculate_SNR(C_fixed, C, M*N));
+
+    // free(C_fixed);
 }
 
 #ifdef GPU
