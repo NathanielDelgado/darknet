@@ -1385,9 +1385,21 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
                         b);                 // output
 
                 }
+                
+                int K = k;
+                int N = n;
+                int *b_fixed = (int*)calloc(sizeof(int), K*N);
+                for (int x = 0; x < K; ++x) {
+                    for (int y = 0; y < N; ++y) {
+                        // fprintf(file, "%f, ", B[x*ldb + y]);
+                        b_fixed[x*N + y] = (int)(b[x*N + y]*(1<<SCALE));
+                    }
+                }
 
-                gemm(0, 0, m, n, k, 1, a, k, b, n, 1, c, n);
+                gemm(0, 0, m, n, k, 1, a, k, (float*)b_fixed, n, 1, c, n);
                 // bit-count to float
+
+                free(b_fixed);
             }
             //c += n*m;
             //state.input += l.c*l.h*l.w;

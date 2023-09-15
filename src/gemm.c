@@ -12,8 +12,6 @@
 #include <omp.h>
 #endif
 
-#define SCALE 13 /* 13-12 seems to work well */ /* Fraction bits? */
-
 #if defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_ARM64)
 static inline uint32_t popcnt(uint32_t v) {
@@ -2634,7 +2632,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
 
 void gemm_nn_fixed(int M, int N, int K, float ALPHA,
     float *A, int lda,
-    float *B, int ldb,
+    int *B, int ldb,
     float *C, int ldc)
 {
     int i, j, k;
@@ -2644,7 +2642,7 @@ void gemm_nn_fixed(int M, int N, int K, float ALPHA,
             PUT_IN_REGISTER int fixed_A_PART = ((int)(ALPHA*(1<<SCALE)) * (int)(A[i * lda + k]*(1<<SCALE))) >> SCALE;
             for (j = 0; j < N; ++j) {
                 /* mapping result*/
-                int fixed_C_PART = ((fixed_A_PART *  (int)(B[k*ldb + j]*(1<<SCALE))) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
+                int fixed_C_PART = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
 
                 /* remapping */
                 C[i*ldc + j] = (float)(fixed_C_PART)/(1<<SCALE);
@@ -2743,7 +2741,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         #pragma omp parallel for
         for (t = 0; t < M; ++t) {
             if (!TA && !TB){
-                gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+                gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, (int*)B, ldb, C + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             }

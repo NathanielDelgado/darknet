@@ -15,6 +15,8 @@
 extern "C" {
 #endif
 
+#define SCALE 13 /* 13-12 seems to work well */ /* Fraction bits? */
+
 #define DARKNET_LOC __FILE__, __func__, __LINE__
 
 LIB_API void free_ptrs(void **ptrs, int n);
