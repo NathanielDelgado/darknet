@@ -98,7 +98,7 @@ CFLAGS=-Wall -Wfatal-errors -Wno-unused-result -Wno-unknown-pragmas -fPIC -rdyna
 
 ifeq ($(DEBUG), 1)
 #OPTS= -O0 -g
-#OPTS= -Og -g
+OPTS= -Og -g
 COMMON+= -DDEBUG
 CFLAGS+= -DDEBUG
 else
