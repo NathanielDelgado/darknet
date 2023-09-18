@@ -2631,7 +2631,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
 }
 
 void gemm_nn_fixed(int M, int N, int K, float ALPHA,
-    float *A, int lda,
+    int *A, int lda,
     int *B, int ldb,
     float *C, int ldc)
 {
@@ -2639,7 +2639,7 @@ void gemm_nn_fixed(int M, int N, int K, float ALPHA,
     for (i = 0; i < M; ++i) {
         for (k = 0; k < K; ++k) {
             /* mapping A_PART*/
-            PUT_IN_REGISTER int fixed_A_PART = ((int)(ALPHA*(1<<SCALE)) * (int)(A[i * lda + k]*(1<<SCALE))) >> SCALE;
+            PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
             for (j = 0; j < N; ++j) {
                 /* mapping result*/
                 int fixed_C_PART = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
@@ -2741,7 +2741,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         #pragma omp parallel for
         for (t = 0; t < M; ++t) {
             if (!TA && !TB){
-                gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, (int*)B, ldb, C + t*ldc, ldc);
+                gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, (int*)B, ldb, C + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             }

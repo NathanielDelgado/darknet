@@ -562,6 +562,7 @@ convolutional_layer make_convolutional_layer(int batch, int steps, int h, int w,
     }
     else {
         l.weights = (float*)xcalloc(l.nweights, sizeof(float));
+        l.weights_fixed = (int*)xcalloc(l.nweights, sizeof(int));
         l.biases = (float*)xcalloc(n, sizeof(float));
 
         if (train) {
@@ -1237,7 +1238,7 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
     {
         for (j = 0; j < l.groups; ++j)
         {
-            float *a = l.weights +j*l.nweights / l.groups;
+            int *a = l.weights_fixed +j*l.nweights / l.groups;
             float *b = state.workspace;
             float *c = l.output +(i*l.groups + j)*n*m;
 
@@ -1396,7 +1397,7 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
                     }
                 }
 
-                gemm(0, 0, m, n, k, 1, a, k, (float*)b_fixed, n, 1, c, n);
+                gemm(0, 0, m, n, k, 1, (float *)a, k, (float*)b_fixed, n, 1, c, n);
                 // bit-count to float
 
                 free(b_fixed);

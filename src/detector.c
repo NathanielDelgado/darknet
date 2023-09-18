@@ -1641,6 +1641,26 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     if (net.letter_box) letter_box = 1;
     net.benchmark_layers = benchmark_layers;
     fuse_conv_batchnorm(net);
+
+    // FILE *file = fopen("yolov3-tiny-fixed.weights", "w");
+    // for(int i = 0; i < net.n; ++i){
+    //     layer l = net.layers[i];
+    //     int *fixed_weights = (int*)calloc(sizeof(int), l.nweights);
+    //     for(int j = 0; j < l.nweights; j++){
+    //         fixed_weights[j] = (int)(l.weights[j]*(1<<SCALE));
+    //     }
+    //     fwrite(fixed_weights, sizeof(int), l.nweights, file);
+    //     free(fixed_weights);
+    // }
+    // fclose(file);
+
+    FILE *file = fopen("yolov3-tiny-fixed.weights", "r");
+    for(int i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        fread(l.weights_fixed, sizeof(int), l.nweights, file);
+    }
+    fclose(file);
+
     calculate_binary_weights(net);
     if (net.layers[net.n - 1].classes != names_size) {
         printf("\n Error: in the file %s number of names %d that isn't equal to classes=%d in the file %s \n",
@@ -1780,6 +1800,10 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     free_list(options);
     free_alphabet(alphabet);
     free_network(net);
+    for(int i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        free(l.weights_fixed);
+    }
 }
 
 #if defined(OPENCV) && defined(GPU)
