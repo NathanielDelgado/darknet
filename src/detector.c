@@ -1642,6 +1642,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     net.benchmark_layers = benchmark_layers;
     fuse_conv_batchnorm(net);
 
+    /* Write fixed-point weights */
     // FILE *file = fopen("yolov3-tiny-fixed.weights", "w");
     // for(int i = 0; i < net.n; ++i){
     //     layer l = net.layers[i];
@@ -1654,6 +1655,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     // }
     // fclose(file);
 
+    /* Read fixed-point weights */
     FILE *file = fopen("yolov3-tiny-fixed.weights", "r");
     for(int i = 0; i < net.n; ++i){
         layer l = net.layers[i];
@@ -1800,6 +1802,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     free_list(options);
     free_alphabet(alphabet);
     free_network(net);
+
+    /* Free fixed-point weights */
     for(int i = 0; i < net.n; ++i){
         layer l = net.layers[i];
         free(l.weights_fixed);
