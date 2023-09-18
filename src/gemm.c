@@ -2630,22 +2630,44 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
+// For testing purposes, block first matrix to 169, second to 256 or 9
+
 void gemm_nn_fixed(int M, int N, int K, float ALPHA,
     int *A, int lda,
     int *B, int ldb,
     float *C, int ldc)
 {
-    int i, j, k;
-    for (i = 0; i < M; ++i) {
-        for (k = 0; k < K; ++k) {
-            /* mapping A_PART*/
-            PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
-            for (j = 0; j < N; ++j) {
-                /* mapping result*/
-                int fixed_C_PART = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
+    
+    int block_size_a = 169; // # of matrix A columns is always divisible by 169
+    int block_size_b = (K & 0xff) ? 256 : 9; // matrix B rows either 256 or 9
+    int num_blocks_a = N / block_size_a;
+    int num_blocks_b = K / block_size_b;
 
-                /* remapping */
-                C[i*ldc + j] = (float)(fixed_C_PART)/(1<<SCALE);
+    int i, j, k, jj, kk;
+
+    for (i=0; i<M; i++) {
+        for (j=0; j<N; j++) {
+            C[i*ldc+j] = 0.0f;
+        }
+    } 
+    
+    for (jj=0; jj<num_blocks_a; jj++) {
+        for (kk=0; kk<num_blocks_b; kk++) {
+            // per block
+            for (i = 0; i < M; ++i) {
+                for (k = 0; k < block_size_b; ++k) {
+                    /* mapping A_PART*/
+                    int y = kk*block_size_b+k;
+                    PUT_IN_REGISTER int fixed_A_PART = A[i * lda + y];
+                    for (j = 0; j < block_size_a; ++j) {
+                        /* mapping result*/
+                        int x = jj*block_size_b+j;
+                        int fixed_C_PART = ((fixed_A_PART * B[y*ldb + x]) >> SCALE) + (int)(C[i*ldc + x]*(1<<SCALE));
+
+                        /* remapping */
+                        C[i*ldc + x] += (float)(fixed_C_PART)/(1<<SCALE);
+                    }
+                }
             }
         }
     }
