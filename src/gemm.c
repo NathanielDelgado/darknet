@@ -2667,7 +2667,7 @@ void gemm_nn_fixed_NEON_fast(int M, int N, int K, float ALPHA,
                     vst1q_s32(&C[i*ldc + j], res);  /* load result */
                 }
                 for (j = N - 8; j < N; ++j) {
-                    C[i*ldc + j] = (fixed_A_PART * B[k*ldb + j]) + C[i*ldc + j];
+                    C[i*ldc + j] += fixed_A_PART * B[k*ldb + j];
                 }
             }
         }
@@ -2697,7 +2697,7 @@ void gemm_nn_fixed_NEON_slow(int M, int N, int K, float ALPHA,
                     vst1q_s32(&C[i*ldc + j], res);  /* load result */
                 }
                 for (j = N - 8; j < N; ++j) {
-                    C[i*ldc + j] = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + C[i*ldc + j];
+                    C[i*ldc + j] += (fixed_A_PART * B[k*ldb + j]) >> SCALE;
                 }
             }
         }
@@ -2749,14 +2749,13 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         B_fixed[i] = (int)(B[i]*(1<<SCALE));
     }
 
+    /* Allocate C matrix for fixed-point result */
     int *C_fixed = (int*)xcalloc(M*ldc, sizeof(int));
 
-    // float *C_fixed = calloc(sizeof(float), M * N);
-
+    /* Write matrix A */
     // static int count = 0;
     // static char fileName[] = "matrixA/matrixA-0";
     // static char letter = '0';
-
     // if(count < 1){
     //     fileName[16] = letter++;
     //     FILE *file = fopen(fileName, "w");
@@ -2773,10 +2772,10 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     //     count++;
     // }
 
+    /* Write matrix B */
     // static int count = 0;
     // static char fileName[] = "matrixB/matrixB-0";
     // static char letter = '0';
-
     // if(count < 1){
     //     fileName[16] = letter++;
     //     FILE *file = fopen(fileName, "w");
@@ -2804,7 +2803,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
             if (!TA && !TB){
                 gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, B_fixed, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
-                // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+                // gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             }
             else if (TA && !TB)
                 gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
@@ -2815,13 +2814,17 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
+    /* Convert C fixed-point (slow) */
+    // for(int i = 0; i < M*ldc; i++){
+    //     C[i] = ((float)C_fixed[i])/(1<<SCALE);
+    // }
+
+    /* Convert C fixed-point (fast) */
     for(int i = 0; i < M*ldc; i++){
         C[i] = ((float)C_fixed[i])/(1<<(SCALE<<1));
     }
 
     // printf("SNR: %f\n", calculate_SNR(C_fixed, C, M*N));
-
-    // free(C_fixed);
 
     free(B_fixed);
     free(C_fixed);

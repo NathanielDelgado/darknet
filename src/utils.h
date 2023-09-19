@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-#define SCALE 12 /* 13-12 seems to work well */ /* Fraction bits? */
+#define SCALE 12 /* 13-12 seems to work well */ /* Fraction bits */
 
 #define DARKNET_LOC __FILE__, __func__, __LINE__
 

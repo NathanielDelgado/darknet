@@ -420,7 +420,7 @@ struct layer {
     float *scales_ema;
 
     float *weights;
-    int *weights_fixed;
+    int *weights_fixed; /* fixed-point version of weights */
     float *weight_updates;
 
     float scale_x_y;
