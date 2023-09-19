@@ -2633,7 +2633,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
 void gemm_nn_fixed(int M, int N, int K, float ALPHA,
     int *A, int lda,
     int *B, int ldb,
-    float *C, int ldc)
+    int *C, int ldc)
 {
     int i, j, k;
     for (i = 0; i < M; ++i) {
@@ -2642,10 +2642,8 @@ void gemm_nn_fixed(int M, int N, int K, float ALPHA,
             PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
             for (j = 0; j < N; ++j) {
                 /* mapping result*/
-                int fixed_C_PART = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + (int)(C[i*ldc + j]*(1<<SCALE));
 
-                /* remapping */
-                C[i*ldc + j] = (float)(fixed_C_PART)/(1<<SCALE);
+                C[i*ldc + j] = ((fixed_A_PART * B[k*ldb + j]) >> SCALE) + C[i*ldc + j];
             }
         }
     }
@@ -2695,6 +2693,8 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     for (int i = 0; i < K*ldb; i++){
         B_fixed[i] = (int)(B[i]*(1<<SCALE));
     }
+
+    int *C_fixed = (int*)xcalloc(M*ldc, sizeof(int));
 
     // float *C_fixed = calloc(sizeof(float), M * N);
 
@@ -2747,7 +2747,7 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         #pragma omp parallel for
         for (t = 0; t < M; ++t) {
             if (!TA && !TB){
-                gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, B_fixed, ldb, C + t*ldc, ldc);
+                gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, B_fixed, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
                 // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             }
@@ -2760,11 +2760,16 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
+    for(int i = 0; i < M*ldc; i++){
+        C[i] = ((float)C_fixed[i])/(1<<SCALE);
+    }
+
     // printf("SNR: %f\n", calculate_SNR(C_fixed, C, M*N));
 
     // free(C_fixed);
 
     free(B_fixed);
+    free(C_fixed);
 }
 
 #ifdef GPU
