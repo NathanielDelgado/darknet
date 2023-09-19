@@ -1643,17 +1643,17 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     fuse_conv_batchnorm(net);
 
     /* Write fixed-point weights */
-    // FILE *file_write = fopen("yolov3-tiny-fixed.weights", "w");
-    // for(int i = 0; i < net.n; ++i){
-    //     layer l = net.layers[i];
-    //     int *fixed_weights = (int*)calloc(sizeof(int), l.nweights);
-    //     for(int j = 0; j < l.nweights; j++){
-    //         fixed_weights[j] = (int)(l.weights[j]*(1<<SCALE));
-    //     }
-    //     fwrite(fixed_weights, sizeof(int), l.nweights, file_write);
-    //     free(fixed_weights);
-    // }
-    // fclose(file_write);
+    FILE *file_write = fopen("yolov3-tiny-fixed.weights", "w");
+    for(int i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        int *fixed_weights = (int*)calloc(sizeof(int), l.nweights);
+        for(int j = 0; j < l.nweights; j++){
+            fixed_weights[j] = (int)(l.weights[j]*(1<<SCALE));
+        }
+        fwrite(fixed_weights, sizeof(int), l.nweights, file_write);
+        free(fixed_weights);
+    }
+    fclose(file_write);
 
     /* Read fixed-point weights */
     FILE *file_read = fopen("yolov3-tiny-fixed.weights", "r");
