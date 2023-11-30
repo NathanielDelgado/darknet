@@ -1624,6 +1624,34 @@ void calc_anchors(char *datacfg, int num_of_clusters, int width, int height, int
     getchar();
 }
 
+void create_fixp_weights(network net)
+{
+    FILE *file = fopen("yolov3-tiny-fixed.weights", "w");
+
+    for(int i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        int *fixed_weights = (int *)calloc(sizeof(int), l.nweights);
+        for(int j = 0; j < l.nweights; j++){
+            fixed_weights[j] = (int)(l.weights[j]*(1<<SCALE));
+        }
+        fwrite(fixed_weights, sizeof(int), l.nweights, file);
+        free(fixed_weights);
+    }
+
+    fclose(file);
+}
+
+void read_fixp_weights(network *net)
+{
+    FILE *file = fopen("yolov3-tiny-fixed.weights", "r");
+
+    for(int i = 0; i < net->n; ++i){
+        fread(net->layers[i].weights_fixed, sizeof(int), net->layers[i].nweights, file);
+    }
+
+    fclose(file);
+}
+
 
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh,
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers)
@@ -1642,26 +1670,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     net.benchmark_layers = benchmark_layers;
     fuse_conv_batchnorm(net);
 
-    /* Write fixed-point weights */
-    FILE *file_write = fopen("yolov3-tiny-fixed.weights", "w");
-    for(int i = 0; i < net.n; ++i){
-        layer l = net.layers[i];
-        int *fixed_weights = (int*)calloc(sizeof(int), l.nweights);
-        for(int j = 0; j < l.nweights; j++){
-            fixed_weights[j] = (int)(l.weights[j]*(1<<SCALE));
-        }
-        fwrite(fixed_weights, sizeof(int), l.nweights, file_write);
-        free(fixed_weights);
-    }
-    fclose(file_write);
-
-    /* Read fixed-point weights */
-    FILE *file_read = fopen("yolov3-tiny-fixed.weights", "r");
-    for(int i = 0; i < net.n; ++i){
-        layer l = net.layers[i];
-        fread(l.weights_fixed, sizeof(int), l.nweights, file_read);
-    }
-    fclose(file_read);
+    create_fixp_weights(net);
+    read_fixp_weights(&net);
 
     calculate_binary_weights(net);
     if (net.layers[net.n - 1].classes != names_size) {
@@ -1802,12 +1812,6 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     free_list(options);
     free_alphabet(alphabet);
     free_network(net);
-
-    /* Free fixed-point weights */
-    for(int i = 0; i < net.n; ++i){
-        layer l = net.layers[i];
-        free(l.weights_fixed);
-    }
 }
 
 #if defined(OPENCV) && defined(GPU)
