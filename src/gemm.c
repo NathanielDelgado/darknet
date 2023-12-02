@@ -12,6 +12,7 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
+#include "gemm_hal.h"
 
 #if defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_ARM64)
@@ -2743,6 +2744,12 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         }
     }
 
+    /* Convert A matrix fo fixed-point */
+    int *A_fixed = (int*)xmalloc(sizeof(int) * N*lda);
+    for (int i = 0; i < N*ldb; i++){
+        A_fixed[i] = (int)(A[i]*(1<<SCALE));
+    }
+
     /* Convert B matrix fo fixed-point */
     int *B_fixed = (int*)xmalloc(sizeof(int) * K*ldb);
     for (int i = 0; i < K*ldb; i++){
@@ -2798,7 +2805,8 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     }
     else {
         int t;
-        #pragma omp parallel for
+        // #pragma omp parallel for
+        /*
         for (t = 0; t < M; ++t) {
             if (!TA && !TB){
                 gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, B_fixed, ldb, C_fixed + t*ldc, ldc);
@@ -2812,6 +2820,9 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
             else
                 gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
         }
+        */
+        printf("Gemm called\n");
+        fpga_gemm(M, N, K, A_fixed, B_fixed, C_fixed);
     }
 
     /* Convert C fixed-point (slow) */

@@ -8,6 +8,7 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
+#include "gemm_hal.h"
 
 #ifndef __COMPAR_FN_T
 #define __COMPAR_FN_T
@@ -1633,6 +1634,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     int names_size = 0;
     char **names = get_labels_custom(name_list, &names_size); //get_labels(name_list);
 
+    fpga_init();
+
     image **alphabet = load_alphabet();
     network net = parse_network_cfg_custom(cfgfile, 1, 1); // set batch=1
     if (weightfile) {
@@ -1808,6 +1811,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         layer l = net.layers[i];
         free(l.weights_fixed);
     }
+    fpga_deinit();
 }
 
 #if defined(OPENCV) && defined(GPU)
