@@ -8,7 +8,7 @@
 #include <float.h>
 #include <string.h>
 #include <stdint.h>
-#include <arm_neon.h>
+// #include <arm_neon.h>
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
@@ -2632,78 +2632,76 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
-void gemm_nn_fixed(int M, int N, int K, float ALPHA,
-    int *A, int lda,
-    int *B, int ldb,
-    int *C, int ldc)
+void gemm_nn_fixed(int M, int N, int K,
+                   int *A, int *B, int *C)
 {
     int i, j, k;
     for (i = 0; i < M; ++i) {
         for (k = 0; k < K; ++k) {
             /* mapping A_PART*/
-            PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
+            PUT_IN_REGISTER int fixed_A_PART = A[i * K + k];
             for (j = 0; j < N; ++j) {
                 /* mapping result*/
-                C[i*ldc + j] += fixed_A_PART * B[k*ldb + j];
+                C[i * N + j] += fixed_A_PART * B[k * N + j];
             }
         }
     }
 }
 
-void gemm_nn_fixed_NEON_fast(int M, int N, int K, float ALPHA,
-    int *A, int lda,
-    int *B, int ldb,
-    int *C, int ldc)
-{
-    int i, j, k;
-    for (i = 0; i < M; ++i) {
-        for (k = 0; k < K; ++k) {
-            int32x4_t a = vdupq_n_s32(A[i * lda + k]);  /* load a */
-            PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
-            if(A[i * lda + k]){
-                for (j = 0; j < N - 8; j += 4) {
-                    int32x4_t b = vld1q_s32(&B[k*ldb + j]); /* load b */
-                    int32x4_t c = vld1q_s32(&C[i*ldc + j]); /* load c */
-                    int32x4_t res = vmlaq_s32(c, a, b); /* mac */
-                    vst1q_s32(&C[i*ldc + j], res);  /* load result */
-                }
-                for (j = N - 8; j < N; ++j) {
-                    C[i*ldc + j] += fixed_A_PART * B[k*ldb + j];
-                }
-            }
-        }
-    }
-}
+// void gemm_nn_fixed_NEON_fast(int M, int N, int K, float ALPHA,
+//     int *A, int lda,
+//     int *B, int ldb,
+//     int *C, int ldc)
+// {
+//     int i, j, k;
+//     for (i = 0; i < M; ++i) {
+//         for (k = 0; k < K; ++k) {
+//             int32x4_t a = vdupq_n_s32(A[i * lda + k]);  /* load a */
+//             PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
+//             if(A[i * lda + k]){
+//                 for (j = 0; j < N - 8; j += 4) {
+//                     int32x4_t b = vld1q_s32(&B[k*ldb + j]); /* load b */
+//                     int32x4_t c = vld1q_s32(&C[i*ldc + j]); /* load c */
+//                     int32x4_t res = vmlaq_s32(c, a, b); /* mac */
+//                     vst1q_s32(&C[i*ldc + j], res);  /* load result */
+//                 }
+//                 for (j = N - 8; j < N; ++j) {
+//                     C[i*ldc + j] += fixed_A_PART * B[k*ldb + j];
+//                 }
+//             }
+//         }
+//     }
+// }
 
-void gemm_nn_fixed_NEON_slow(int M, int N, int K, float ALPHA,
-    int *A, int lda,
-    int *B, int ldb,
-    int *C, int ldc)
-{
-    int i, j, k;
-    for (i = 0; i < M; ++i) {
-        for (k = 0; k < K; ++k) {
-            int32x4_t a = vdupq_n_s32(A[i * lda + k]);  /* load a */
-            PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
-            if(A[i * lda + k]){
-                for (j = 0; j < N - 8; j += 4) {
-                    int32x4_t b = vld1q_s32(&B[k*ldb + j]); /* load b */
+// void gemm_nn_fixed_NEON_slow(int M, int N, int K, float ALPHA,
+//     int *A, int lda,
+//     int *B, int ldb,
+//     int *C, int ldc)
+// {
+//     int i, j, k;
+//     for (i = 0; i < M; ++i) {
+//         for (k = 0; k < K; ++k) {
+//             int32x4_t a = vdupq_n_s32(A[i * lda + k]);  /* load a */
+//             PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
+//             if(A[i * lda + k]){
+//                 for (j = 0; j < N - 8; j += 4) {
+//                     int32x4_t b = vld1q_s32(&B[k*ldb + j]); /* load b */
 
-                    /* multiply */
-                    int32x4_t a_times_b = vmulq_s32(a, b);
-                    a_times_b = vshrq_n_s32(a_times_b, SCALE);
+//                     /* multiply */
+//                     int32x4_t a_times_b = vmulq_s32(a, b);
+//                     a_times_b = vshrq_n_s32(a_times_b, SCALE);
 
-                    int32x4_t c = vld1q_s32(&C[i*ldc + j]); /* load c */
-                    int32x4_t res = vaddq_s32(c, a_times_b); /* add */
-                    vst1q_s32(&C[i*ldc + j], res);  /* load result */
-                }
-                for (j = N - 8; j < N; ++j) {
-                    C[i*ldc + j] += (fixed_A_PART * B[k*ldb + j]) >> SCALE;
-                }
-            }
-        }
-    }
-}
+//                     int32x4_t c = vld1q_s32(&C[i*ldc + j]); /* load c */
+//                     int32x4_t res = vaddq_s32(c, a_times_b); /* add */
+//                     vst1q_s32(&C[i*ldc + j], res);  /* load result */
+//                 }
+//                 for (j = N - 8; j < N; ++j) {
+//                     C[i*ldc + j] += (fixed_A_PART * B[k*ldb + j]) >> SCALE;
+//                 }
+//             }
+//         }
+//     }
+// }
 
 // SNR calcuation.
 // C_fxp is the fixed-point matrix.
@@ -2727,6 +2725,27 @@ float calculate_SNR(float *C_fxp, float *C_flp, int length)
   return SNR;
 }
 
+void write_matrix(char letter, int *matrix, int X, int Y)
+{
+    static char fileName[] = "matrix/matrix ";
+    fileName[13] = letter;
+
+    FILE *file = fopen(fileName, "w");
+
+    fprintf(file, "/* %s - X: %d Y: %d */\n", fileName, X, Y);
+
+    fprintf(file, "float matrixA[] = {");
+    for (int x = 0; x < X; ++x) {
+        for (int y = 0; y < Y; ++y) {
+            fprintf(file, "%d, ", matrix[x * Y + y]);
+        }
+        fprintf(file, "\n");
+    }
+    fprintf(file, "};\n");
+
+    fclose(file);
+}
+
 
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
@@ -2735,14 +2754,6 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *C, int ldc)
 {
     //printf("cpu: %d %d %d %d %d %f %d %d %f %d\n",TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
-    if (BETA != 1){
-        int i, j;
-        for(i = 0; i < M; ++i){
-            for(j = 0; j < N; ++j){
-                C[i*ldc + j] *= BETA;
-            }
-        }
-    }
 
     /* Convert A matrix fo fixed-point */
     int *A_fixed = (int*)xmalloc(sizeof(int) * N*lda);
@@ -2751,8 +2762,8 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     }
 
     /* Convert B matrix fo fixed-point */
-    int *B_fixed = (int*)xmalloc(sizeof(int) * K*ldb);
-    for (int i = 0; i < K*ldb; i++){
+    int *B_fixed = (int *)xmalloc(sizeof(int) * K*N);
+    for (int i = 0; i < K*N; i++){
         B_fixed[i] = (int)(B[i]*(1<<SCALE));
     }
 
@@ -2825,17 +2836,12 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         fpga_gemm(M, N, K, A_fixed, B_fixed, C_fixed);
     }
 
-    /* Convert C fixed-point (slow) */
-    // for(int i = 0; i < M*ldc; i++){
-    //     C[i] = ((float)C_fixed[i])/(1<<SCALE);
-    // }
+    gemm_nn_fixed(M, N, K, (int*)A, B_fixed, C_fixed);
 
     /* Convert C fixed-point (fast) */
     for(int i = 0; i < M*ldc; i++){
         C[i] = ((float)C_fixed[i])/(1<<(SCALE<<1));
     }
-
-    // printf("SNR: %f\n", calculate_SNR(C_fixed, C, M*N));
 
     free(B_fixed);
     free(C_fixed);
