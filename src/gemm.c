@@ -12,6 +12,7 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
+// #include "gemm_hal.h"
 
 #if defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_ARM64)
@@ -2655,8 +2656,8 @@ void gemm_nn_fixed_blocked_NEON_fast(int M, int N, int K, float ALPHA,
     int *C, int ldc)
 {
     // #pragma omp parallel for collapse(2)
-    omp_set_num_threads(4);
-    #pragma omp parallel for num_threads(4)
+    omp_set_num_threads(10);
+    #pragma omp parallel for num_threads(10)
     for (int ii = 0; ii < M; ii += BLOCK_SIZE) {
         for (int kk = 0; kk < K; kk += BLOCK_SIZE) {
             for (int i = ii; i < ii + BLOCK_SIZE && i < M; ++i) {
@@ -2789,6 +2790,12 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
 {
     //printf("cpu: %d %d %d %d %d %f %d %d %f %d\n",TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
 
+    /* Convert A matrix fo fixed-point */
+    int *A_fixed = (int*)xmalloc(sizeof(int) * N*lda);
+    for (int i = 0; i < N*ldb; i++){
+        A_fixed[i] = (int)(A[i]*(1<<SCALE));
+    }
+
     /* Convert B matrix fo fixed-point */
     int *B_fixed = (int *)xmalloc(sizeof(int) * K*N);
     for (int i = 0; i < K*N; i++){
@@ -2796,7 +2803,73 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     }
 
     /* Allocate C matrix for fixed-point result */
-    int *C_fixed = (int *)xcalloc(M*N, sizeof(int));
+    int *C_fixed = (int*)xcalloc(M*ldc, sizeof(int));
+
+    /* Write matrix A */
+    // static int count = 0;
+    // static char fileName[] = "matrixA/matrixA-0";
+    // static char letter = '0';
+    // if(count < 1){
+    //     fileName[16] = letter++;
+    //     FILE *file = fopen(fileName, "w");
+    //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
+    //     fprintf(file, "float matrixA[] = {");
+    //     for (int i = 0; i < M; ++i) {
+    //         for (int k = 0; k < K; ++k) {
+    //             fprintf(file, "%f, ", A[i * lda + k]);
+    //         }
+    //         fprintf(file, "\n");
+    //     }
+    //     fprintf(file, "};\n");
+    //     fclose(file);
+    //     count++;
+    // }
+
+    /* Write matrix B */
+    // static int count = 0;
+    // static char fileName[] = "matrixB/matrixB-0";
+    // static char letter = '0';
+    // if(count < 1){
+    //     fileName[16] = letter++;
+    //     FILE *file = fopen(fileName, "w");
+    //     fprintf(file, "/* %s - cpu: TA: %d TB: %d M: %d N: %d K: %d ALPHA: %f lda: %d ldb: %d BETA: %f ldc: %d */\n",fileName, TA, TB, M, N, K, ALPHA, lda, ldb, BETA, ldc);
+    //     fprintf(file, "float matrixB[] = {");
+    //     for (int k = 0; k < K; ++k) {
+    //         for (int j = 0; j < N; ++j) {
+    //             fprintf(file, "%f, ", B[k*ldb + j]);
+    //         }
+    //         fprintf(file, "\n");
+    //     }
+    //     fprintf(file, "};\n");
+    //     fclose(file);
+    //     count++;
+    // }
+
+    is_avx();   // initialize static variable
+    if (is_fma_avx2() && !TA && !TB) {
+        gemm_nn_fast(M, N, K, ALPHA, A, lda, B, ldb, C, ldc);
+    }
+    else {
+        int t;
+        // #pragma omp parallel for
+        /*
+        for (t = 0; t < M; ++t) {
+            if (!TA && !TB){
+                gemm_nn_fixed(1, N, K, ALPHA, (int*)(A + t*lda), lda, B_fixed, ldb, C_fixed + t*ldc, ldc);
+                // gemm_nn_fixed(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C_fixed + t*ldc, ldc);
+                // gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+            }
+            else if (TA && !TB)
+                gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
+            else if (!TA && TB)
+                gemm_nt(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
+            else
+                gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
+        }
+        */
+        printf("Gemm called\n");
+        fpga_gemm(M, N, K, A_fixed, B_fixed, C_fixed);
+    }
 
     // gemm_nn_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
     gemm_nn_fixed_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
