@@ -8,6 +8,7 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
+#include "hal.h"
 
 #ifndef __COMPAR_FN_T
 #define __COMPAR_FN_T
@@ -1656,6 +1657,7 @@ void read_fixp_weights(network *net)
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh,
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers)
 {
+    // hal_init();
     list *options = read_data_cfg(datacfg);
     char *name_list = option_find_str(options, "names", "data/names.list");
     int names_size = 0;
@@ -1812,6 +1814,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     free_list(options);
     free_alphabet(alphabet);
     free_network(net);
+    // hal_deinit();
 }
 
 #if defined(OPENCV) && defined(GPU)

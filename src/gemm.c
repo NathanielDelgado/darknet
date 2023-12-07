@@ -8,7 +8,7 @@
 #include <float.h>
 #include <string.h>
 #include <stdint.h>
-// #include <arm_neon.h>
+#include <arm_neon.h>
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
@@ -2647,12 +2647,47 @@ void gemm_nn_fixed(int M, int N, int K,
     }
 }
 
+#define BLOCK_SIZE 16
+
+void gemm_nn_fixed_blocked_NEON_fast(int M, int N, int K, float ALPHA,
+    int *A, int lda,
+    int *B, int ldb,
+    int *C, int ldc)
+{
+    // #pragma omp parallel for collapse(2)
+    omp_set_num_threads(4);
+    #pragma omp parallel for num_threads(4)
+    for (int ii = 0; ii < M; ii += BLOCK_SIZE) {
+        for (int kk = 0; kk < K; kk += BLOCK_SIZE) {
+            for (int i = ii; i < ii + BLOCK_SIZE && i < M; ++i) {
+                for (int k = kk; k < kk + BLOCK_SIZE && k < K; ++k) {
+                    int32x4_t a = vdupq_n_s32(A[i * lda + k]); /* load a */
+                    PUT_IN_REGISTER int fixed_A_PART = A[i * lda + k];
+                    if (A[i * lda + k]) {
+                        for (int j = 0; j < N - 8; j += 4) {
+                            int32x4_t b = vld1q_s32(&B[k * ldb + j]); /* load b */
+                            int32x4_t c = vld1q_s32(&C[i * ldc + j]); /* load c */
+                            int32x4_t res = vmlaq_s32(c, a, b);       /* mac */
+                            vst1q_s32(&C[i * ldc + j], res);           /* store result */
+                        }
+                        for (int j = N - 8; j < N; ++j) {
+                            C[i * ldc + j] += fixed_A_PART * B[k * ldb + j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 // void gemm_nn_fixed_NEON_fast(int M, int N, int K, float ALPHA,
 //     int *A, int lda,
 //     int *B, int ldb,
 //     int *C, int ldc)
 // {
 //     int i, j, k;
+//     #pragma omp parallel for private(i, j, k)
 //     for (i = 0; i < M; ++i) {
 //         for (k = 0; k < K; ++k) {
 //             int32x4_t a = vdupq_n_s32(A[i * lda + k]);  /* load a */
@@ -2763,7 +2798,9 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     /* Allocate C matrix for fixed-point result */
     int *C_fixed = (int *)xcalloc(M*N, sizeof(int));
 
-    gemm_nn_fixed(M, N, K, (int*)A, B_fixed, C_fixed);
+    // gemm_nn_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
+    gemm_nn_fixed_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
+    // gemm_nn_fixed(M, N, K, (int*)A, B_fixed, C_fixed);
 
     /* Convert C fixed-point (fast) */
     for(int i = 0; i < M*ldc; i++){
