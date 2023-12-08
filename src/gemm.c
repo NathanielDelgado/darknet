@@ -12,7 +12,7 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
-// #include "gemm_hal.h"
+#include "gemm_hal.h"
 
 #if defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_ARM64)
@@ -2805,9 +2805,11 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     /* Allocate C matrix for fixed-point result */
     int *C_fixed = (int*)xcalloc(M*ldc, sizeof(int));
 
-    // gemm_nn_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
-    gemm_nn_fixed_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
-    // gemm_nn_fixed(M, N, K, (int*)A, B_fixed, C_fixed);
+    gemm_fpga(M, N, K, (int *)A, B_fixed, C_fixed);
+
+    // // gemm_nn_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
+    // gemm_nn_fixed_blocked_NEON_fast(M, N, K, ALPHA, (int*)A, lda, B_fixed, ldb, C_fixed, ldc);
+    // // gemm_nn_fixed(M, N, K, (int*)A, B_fixed, C_fixed);
 
     /* Convert C fixed-point (fast) */
     for(int i = 0; i < M*ldc; i++){

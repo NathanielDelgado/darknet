@@ -8,7 +8,7 @@
 #include "box.h"
 #include "demo.h"
 #include "option_list.h"
-// #include "hal.h"
+#include "gemm_hal.h"
 
 #ifndef __COMPAR_FN_T
 #define __COMPAR_FN_T
@@ -1657,13 +1657,12 @@ void read_fixp_weights(network *net)
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh,
     float hier_thresh, int dont_show, int ext_output, int save_labels, char *outfile, int letter_box, int benchmark_layers)
 {
-    // hal_init();
     list *options = read_data_cfg(datacfg);
     char *name_list = option_find_str(options, "names", "data/names.list");
     int names_size = 0;
     char **names = get_labels_custom(name_list, &names_size); //get_labels(name_list);
 
-    // fpga_init();
+    gemm_init();
 
     image **alphabet = load_alphabet();
     network net = parse_network_cfg_custom(cfgfile, 1, 1); // set batch=1
@@ -1816,7 +1815,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     free_list(options);
     free_alphabet(alphabet);
     free_network(net);
-    // hal_deinit();
+    
+    gemm_deinit();
 }
 
 #if defined(OPENCV) && defined(GPU)
